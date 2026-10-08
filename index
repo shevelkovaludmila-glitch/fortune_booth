@@ -166,7 +166,7 @@ const ASSETS = {
   arrowBtn:       'assets/btn-arrow.webp',    // кнопка со стрелкой
   introVideo:     'assets/intro.mp4',         // видео-введение с аниматроником
   boothStill:     'assets/booth-still.webp',  // статичный кадр после видео ('' — останется последний кадр видео)
-  capsuleVideo:   '',                         // ролик с капсулой после «Да» ('' — без ролика)
+  capsuleVideo:   'assets/capsule.mp4',       // ролик с капсулой после «Да» ('' — без ролика)
   questionPlaque: 'assets/question.webp',     // плашка «Желаете получить предсказание?»
   yesBtn:         'assets/btn-yes.webp',      // кнопка «Да»
   parchment:      'assets/parchment.webp',    // пустой пергамент
