@@ -90,8 +90,8 @@ body{font-family:"Cormorant Garamond",Georgia,serif;color:var(--gold)}
   visibility:hidden;pointer-events:none}
 .parchment-box.open{visibility:visible;pointer-events:auto}
 #parchment{display:block;filter:drop-shadow(0 0 22px rgba(255,200,110,.35))}
-.parchment-box.open #parchment{animation:unf 1.1s cubic-bezier(.2,.8,.2,1) both}
-@keyframes unf{0%{opacity:0;transform:translateY(30vh) scale(.12)}45%{opacity:1;transform:translateY(0) scale(.7,.06)}100%{opacity:1;transform:none}}
+.parchment-box.open #parchment{animation:unfurl 1.1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes unfurl{0%{opacity:0;transform:translateY(30vh) scale(.12)}45%{opacity:1;transform:translateY(0) scale(.7,.06)}100%{opacity:1;transform:none}}
 .repeat-note{margin:0;min-height:1.3em;font-size:19px;font-style:italic;opacity:0;transition:opacity .6s;text-shadow:0 0 10px #000,0 0 4px #000}
 .repeat-note.shown{opacity:1}
 .release-btn{width:var(--release-width);opacity:0;transform:translateY(10px);pointer-events:none}
@@ -180,7 +180,7 @@ const ASSETS = {
   sfxDust:        ''                          // звук рассыпания (mp3), необязательно
 };
 
-//  веб-приложения Apps Script. Пока пусто — работает демо-режим без записи в таблицу.
+// URL веб-приложения Apps Script. Пока пусто — работает демо-режим без записи в таблицу.
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby3L20C50yzs_X_3gag2XgIXSR_mNQcUu5qSqK08RsNev7n0fAQtnKZOI9dO4504m9b/exec';
 
 // Область текста на пергаменте (доли от его ширины и высоты)
@@ -268,13 +268,24 @@ if (ASSETS.capsuleVideo) { capsule.src = ASSETS.capsuleVideo; capsule.load(); }
 capsule.addEventListener('error', () => { capsuleFailed = true; });
 
 function playVideo(v, enabled) {
+  // Ролик считается законченным по любому из сигналов: событие ended, почти дошли до конца,
+  // ошибка или страховочный таймер. Иначе на части телефонов ended не приходит и всё замирает.
   return new Promise(res => {
     if (!enabled) { setTimeout(res, 1200); return; }
-    let done = false;
-    const fin = () => { if (!done) { done = true; res(); } };
+    let done = false, guard = 0;
+    const tick = () => { if (v.duration && v.currentTime >= v.duration - 0.25) fin(); };
+    const fin = () => {
+      if (done) return;
+      done = true; clearTimeout(guard);
+      v.removeEventListener('timeupdate', tick);
+      res();
+    };
+    const arm = () => { clearTimeout(guard); guard = setTimeout(fin, ((v.duration || 10) + 3) * 1000); };
     v.addEventListener('ended', fin, { once: true });
     v.addEventListener('error', fin, { once: true });
-    setTimeout(fin, 30000);
+    v.addEventListener('timeupdate', tick);
+    if (v.readyState >= 1 && v.duration) arm();
+    else { guard = setTimeout(fin, 15000); v.addEventListener('loadedmetadata', arm, { once: true }); }
     const p = v.play();
     if (p && p.catch) p.catch(() => { v.muted = true; v.play().catch(fin); });
   });
@@ -327,7 +338,7 @@ yesBtn.addEventListener('click', () => {
   }
 
   Promise.all([animDone, getFortune(bigoId)])
-    .then(([, f]) => { whisper.classList.remove('shown'); openParchment(f); })
+    .then(([, f]) => { whisper.classList.remove('shown'); return openParchment(f); })
     .catch(() => {
       whisper.classList.remove('shown');
       capsule.classList.remove('shown');
@@ -431,9 +442,13 @@ function drawParchment(text) {
 }
 
 async function openParchment(f) {
-  await fontReady;
-  try { await document.fonts.load('40px "Marck Script"', f.text); } catch (e) {}
-  drawParchment(f.text);
+  // Шрифт ждём не дольше 1,5 с: лучше показать листок сразу, чем зависнуть
+  try { await Promise.race([fontReady, wait(1500)]); } catch (e) {}
+  try { await Promise.race([document.fonts.load('40px "Marck Script"', f.text), wait(1500)]); } catch (e) {}
+  try { drawParchment(f.text); }
+  catch (e) {
+    try { parchReady = false; drawParchment(f.text); } catch (e2) { console.error(e2); }
+  }
   repeatNote.classList.toggle('shown', !!f.repeat);
   parchmentBox.classList.add('open');
   setTimeout(() => releaseBtn.classList.add('shown'), RELEASE_DELAY);
