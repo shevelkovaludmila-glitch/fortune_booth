@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Будка предсказаний</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Marck+Script&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ===== ПОЛОЖЕНИЕ ЭЛЕМЕНТОВ — подгоните под свои картинки ===== */
+  --id-plaque-width: 88%;     /* ширина таблички Bigo ID */
+  --id-plaque-bottom: 24%;    /* отступ таблички от низа экрана */
+  /* тёмное окошко для ввода внутри таблички, в % от самой таблички */
+  --id-win-left: 20%;
+  --id-win-top: 52%;
+  --id-win-width: 60%;
+  --id-win-height: 30%;
+  --arrow-size: 72px;         /* кнопка со стрелкой */
+  --question-width: 86%;      /* плашка «Желаете получить предсказание?» */
+  --question-bottom: 20%;
+  --yes-width: 52%;           /* кнопка «Да» */
+  --parchment-width: 80%;     /* пергамент, от ширины экрана (не больше 380px) */
+  --release-width: 72%;       /* кнопка «Отпустить предсказание» */
+
+  --gold:#e8c873; --gold-dim:#a8873f;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+body{font-family:"Cormorant Garamond",Georgia,serif;color:var(--gold)}
+#app{position:relative;width:100%;max-width:480px;height:100vh;height:100dvh;margin:0 auto;overflow:hidden;background:#07060a}
+
+.screen{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .7s ease,visibility 0s linear .7s}
+.screen.on{opacity:1;visibility:visible;transition:opacity .7s ease}
+.full{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.6))}
+.hidden-soft{opacity:0;transition:opacity .6s ease}
+.hidden-soft.shown{opacity:1}
+
+/* заглушки на месте ещё не подключённых картинок */
+.ph{display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;
+  border:1px dashed rgba(232,200,115,.55);background:linear-gradient(135deg,#2b1e13,#130c07);
+  color:var(--gold);font-size:15px;line-height:1.2}
+.full.ph{font-size:18px;border:0;background:radial-gradient(ellipse at 50% 40%,#2a1b2e,#08060a 70%)}
+
+/* ----- экран входа ----- */
+.login{position:absolute;left:0;right:0;bottom:var(--id-plaque-bottom);display:flex;flex-direction:column;align-items:center;gap:14px}
+.plaque{position:relative;width:var(--id-plaque-width)}
+.plaque-img{display:block;width:100%;height:auto}
+.id-input{position:absolute;left:var(--id-win-left);top:var(--id-win-top);width:var(--id-win-width);height:var(--id-win-height);
+  background:transparent;border:0;outline:0;padding:0 6px;text-align:center;color:var(--gold);
+  font:700 clamp(18px,5.5vw,26px) "Cormorant Garamond",serif;letter-spacing:.08em;
+  text-shadow:0 0 8px rgba(232,200,115,.6);caret-color:var(--gold)}
+.plaque.is-ph .id-input{background:rgba(0,0,0,.55);border:1px solid var(--gold-dim);border-radius:4px}
+
+.img-btn{background:none;border:0;padding:0;cursor:pointer;display:block;transition:transform .12s ease,opacity .6s ease}
+.img-btn:active{transform:scale(.95)}
+.img-btn img,.img-btn .ph{display:block;width:100%;height:auto}
+.img-btn .ph{font-weight:700;font-size:19px;border-radius:10px}
+.arrow-btn{width:var(--arrow-size)}
+.arrow-btn .ph{border-radius:50%;font-size:30px}
+
+.error{min-height:1.3em;margin:0;color:#ffb38a;font-size:17px;text-align:center;text-shadow:0 0 8px #000}
+.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+
+/* ----- экран будки ----- */
+.question{position:absolute;left:0;right:0;bottom:var(--question-bottom);display:flex;flex-direction:column;align-items:center;gap:12px;
+  opacity:0;transform:translateY(24px) scale(.96);pointer-events:none;transition:opacity .7s ease,transform .7s ease}
+.question.shown{opacity:1;transform:none;pointer-events:auto}
+.question-img{display:block;width:var(--question-width);height:auto}
+.question .ph.question-img{font-size:24px;font-weight:700;aspect-ratio:4/3}
+.yes-btn{width:var(--yes-width)}
+.question.shown .yes-btn{animation:glow 2.2s ease-in-out infinite}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 4px rgba(255,200,110,.25))}50%{filter:drop-shadow(0 0 16px rgba(255,200,110,.7))}}
+
+.whisper{position:absolute;left:0;right:0;bottom:32%;text-align:center;font-size:26px;font-style:italic;
+  opacity:0;transition:opacity .5s;text-shadow:0 0 12px rgba(232,200,115,.7),0 0 6px #000;pointer-events:none}
+.whisper.shown{opacity:1;animation:breathe 1.6s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.45}}
+
+.parchment-box{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  visibility:hidden;pointer-events:none}
+.parchment-box.open{visibility:visible;pointer-events:auto}
+#parchment{display:block;filter:drop-shadow(0 0 22px rgba(255,200,110,.35))}
+.parchment-box.open #parchment{animation:unfurl 1.1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes unfurl{0%{opacity:0;transform:translateY(30vh) scale(.12)}45%{opacity:1;transform:translateY(0) scale(.7,.06)}100%{opacity:1;transform:none}}
+.repeat-note{margin:0;min-height:1.3em;font-size:19px;font-style:italic;opacity:0;transition:opacity .6s;text-shadow:0 0 10px #000,0 0 4px #000}
+.repeat-note.shown{opacity:1}
+.release-btn{width:var(--release-width);opacity:0;transform:translateY(10px);pointer-events:none}
+.release-btn.shown{opacity:1;transform:none;pointer-events:auto}
+
+.finale{position:absolute;left:8%;right:8%;top:50%;transform:translateY(-50%);margin:0;text-align:center;
+  font-size:30px;font-weight:700;line-height:1.3;opacity:0;transition:opacity 1.4s ease;pointer-events:none;
+  text-shadow:0 0 14px rgba(0,0,0,.95),0 0 26px rgba(232,200,115,.45)}
+.finale.shown{opacity:1}
+.booth-error{position:absolute;left:6%;right:6%;top:12%}
+
+#dust{position:absolute;left:0;top:0;pointer-events:none;z-index:20}
+.demo{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:40;white-space:nowrap;
+  font:12px system-ui,sans-serif;background:rgba(0,0,0,.65);color:#ccc;padding:4px 10px;border-radius:12px;opacity:0;transition:opacity .4s}
+.demo.shown{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ЭКРАН 1: вход -->
+  <section id="sLogin" class="screen on">
+    <img class="full" data-asset="carnivalBg" data-label="Фон карнавала" alt="">
+    <div class="vignette"></div>
+    <form id="loginForm" class="login" autocomplete="off" novalidate>
+      <div class="plaque" id="idPlaque">
+        <img class="plaque-img" data-asset="idPlaque" data-label="Табличка «Введите Bigo ID»" data-ratio="3/1" alt="">
+        <input id="bigoId" class="id-input" type="text" maxlength="30" aria-label="Bigo ID"
+               enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <button type="submit" class="img-btn arrow-btn" aria-label="Подтвердить">
+        <img data-asset="arrowBtn" data-label="➜" data-ratio="1/1" alt="">
+      </button>
+      <p class="error" id="loginError"></p>
+    </form>
+  </section>
+
+  <!-- ЭКРАН 2: будка -->
+  <section id="sBooth" class="screen">
+    <div id="boothPh" class="full ph" style="align-items:flex-start;padding-top:18%" hidden>Видео с предсказательницей</div>
+    <video id="introVideo" class="full" playsinline webkit-playsinline preload="auto"></video>
+    <img id="boothStill" class="full hidden-soft" alt="">
+    <video id="capsuleVideo" class="full hidden-soft" playsinline webkit-playsinline preload="auto"></video>
+    <div class="vignette"></div>
+
+    <div id="questionBox" class="question">
+      <img class="question-img" data-asset="questionPlaque" data-label="Желаете получить предсказание?" data-ratio="4/3" alt="Желаете получить предсказание?">
+      <button id="yesBtn" class="img-btn yes-btn" type="button" aria-label="Да">
+        <img data-asset="yesBtn" data-label="Да" data-ratio="3/1" alt="">
+      </button>
+    </div>
+
+    <div id="whisper" class="whisper">Духи шепчут…</div>
+
+    <div id="parchmentBox" class="parchment-box">
+      <p id="repeatNote" class="repeat-note">Духи уже говорили с вами…</p>
+      <canvas id="parchment" aria-live="polite"></canvas>
+      <button id="releaseBtn" class="img-btn release-btn" type="button" aria-label="Отпустить предсказание">
+        <img data-asset="releaseBtn" data-label="Отпустить предсказание" data-ratio="3/1" alt="">
+      </button>
+    </div>
+
+    <p id="finale" class="finale">Предсказание отпущено.<br>Оно найдёт вас само.</p>
+    <p id="boothError" class="error booth-error"></p>
+  </section>
+
+  <canvas id="dust"></canvas>
+  <div id="demo" class="demo">Демо-режим: таблица не подключена</div>
+</div>
+
+<script>
+/* ================= НАСТРОЙКИ ================= */
+
+// Пути к вашим файлам. Пустая строка '' — элемента нет.
+const ASSETS = {
+  carnivalBg:     'assets/carnival.webp',     // фон экрана входа
+  idPlaque:       'assets/plaque-id.webp',    // табличка «Введите Bigo ID»
+  arrowBtn:       'assets/btn-arrow.webp',    // кнопка со стрелкой
+  introVideo:     'assets/intro.mp4',         // видео-введение с аниматроником
+  boothStill:     'assets/booth-still.webp',  // статичный кадр после видео ('' — останется последний кадр видео)
+  capsuleVideo:   'assets/capsule.mp4',       // ролик с капсулой после «Да» ('' — без ролика)
+  questionPlaque: 'assets/question.webp',     // плашка «Желаете получить предсказание?»
+  yesBtn:         'assets/btn-yes.webp',      // кнопка «Да»
+  parchment:      'assets/parchment.webp',    // пустой пергамент
+  releaseBtn:     'assets/btn-release.webp',  // кнопка «Отпустить предсказание»
+  sfxDust:        ''                          // звук рассыпания (mp3), необязательно
+};
+
+// URL веб-приложения Apps Script. Пока пусто — работает демо-режим без записи в таблицу.
+const SCRIPT_URL = '';
+
+// Область текста на пергаменте (доли от его ширины и высоты)
+const TEXT_BOX   = { x: .17, y: .26, w: .66, h: .48 };
+const TEXT_COLOR = '#3a2210';
+const RELEASE_DELAY = 1600;   // через сколько мс после появления пергамента показать кнопку
+
+// Bigo ID: буквы, цифры, точка, дефис, подчёркивание, 3–30 символов
+const ID_RE = /^[A-Za-z0-9_.\-]{3,30}$/;
+
+// Предсказания для демо-режима (рабочие — в листе Fortunes)
+const DEMO_FORTUNES = [
+  'Шагнёте в неизвестное — найдёте долгожданное.',
+  'Что задумаете в эти дни, то и воплотится.',
+  'Скоро вам откроется тайна: слушайте тишину.',
+  'Посеянное вами скоро даст богатый урожай.',
+  'Возьмёте дело в свои руки, и всё встанет на свои места.',
+  'Мудрый совет придёт от старшего: не пропустите его.',
+  'Сердце скоро сделает выбор, и он будет верным.',
+  'Впереди победа: кто не свернёт, тот приедет первым.',
+  'Где не поможет напор, там поможет ваша мягкость.',
+  'Ответ, который вы ищете, придёт в тишине.',
+  'Колесо удачи повернулось к вам: ловите момент.',
+  'Скоро вам воздастся по заслугам, и сполна.',
+  'Остановитесь и взгляните иначе: озарение уже близко.',
+  'Старое уйдёт, чтобы освободить место лучшему.',
+  'Терпение скоро вознаградит вас покоем.',
+  'Скоро вы сбросите то, что держало, и вздохнёте свободно.',
+  'Неожиданная перемена расчистит вам дорогу.',
+  'Загаданное сбудется: звёзды на вашей стороне.',
+  'Туман рассеется, и правда выйдет на свет.',
+  'Впереди светлая полоса: радость постучится в ваш дом.',
+  'Прошлое позовёт вас, чтобы дать второй шанс.',
+  'Начатое завершится успехом, и вы отпразднуете победу.',
+  'Сердце скоро наполнится радостью, как чаша до краёв.',
+  'Скоро встретите того, с кем будете на одной волне.',
+  'Впереди праздник в кругу друзей: готовьте бокалы.',
+  'Чего пожелаете сейчас, то и получите.',
+  'Скоро в руки придёт выгодное предложение.',
+  'Достаток придёт в ваш дом и останется надолго.',
+  'Скоро о ваших успехах заговорят все вокруг.',
+  'Добрые вести уже в пути: ждите их со дня на день.'
+];
+
+/* ================= КОД ================= */
+const $ = s => document.querySelector(s);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+const app = $('#app'), sLogin = $('#sLogin'), sBooth = $('#sBooth');
+const form = $('#loginForm'), input = $('#bigoId'), loginError = $('#loginError');
+const intro = $('#introVideo'), still = $('#boothStill'), capsule = $('#capsuleVideo'), boothPh = $('#boothPh');
+const questionBox = $('#questionBox'), yesBtn = $('#yesBtn'), whisper = $('#whisper');
+const parchmentBox = $('#parchmentBox'), cv = $('#parchment'), repeatNote = $('#repeatNote'), releaseBtn = $('#releaseBtn');
+const finale = $('#finale'), boothError = $('#boothError'), dust = $('#dust'), demo = $('#demo');
+
+let bigoId = '', busy = false, released = false;
+let introFailed = !ASSETS.introVideo, stillOk = !!ASSETS.boothStill, capsuleFailed = !ASSETS.capsuleVideo;
+
+// --- картинки и заглушки ---
+document.querySelectorAll('img[data-asset]').forEach(img => {
+  const src = ASSETS[img.dataset.asset];
+  const fail = () => {
+    const d = document.createElement('div');
+    d.className = img.className + ' ph';
+    d.textContent = img.dataset.label || '';
+    if (img.dataset.ratio) d.style.aspectRatio = img.dataset.ratio;
+    if (img.parentElement.classList.contains('plaque')) img.parentElement.classList.add('is-ph');
+    img.replaceWith(d);
+  };
+  if (!src) { fail(); return; }
+  img.onerror = fail;
+  img.src = src;
+});
+
+const parchImg = new Image();
+let parchReady = false;
+if (ASSETS.parchment) { parchImg.onload = () => parchReady = true; parchImg.src = ASSETS.parchment; }
+
+// --- видео ---
+if (ASSETS.introVideo) { intro.src = ASSETS.introVideo; intro.load(); }
+intro.addEventListener('error', () => { introFailed = true; });
+if (ASSETS.boothStill) { still.onerror = () => { stillOk = false; }; still.src = ASSETS.boothStill; }
+if (ASSETS.capsuleVideo) { capsule.src = ASSETS.capsuleVideo; capsule.load(); }
+capsule.addEventListener('error', () => { capsuleFailed = true; });
+
+function playVideo(v, enabled) {
+  return new Promise(res => {
+    if (!enabled) { setTimeout(res, 1200); return; }
+    let done = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    v.addEventListener('ended', fin, { once: true });
+    v.addEventListener('error', fin, { once: true });
+    setTimeout(fin, 30000);
+    const p = v.play();
+    if (p && p.catch) p.catch(() => { v.muted = true; v.play().catch(fin); });
+  });
+}
+
+function showBoothBase() {
+  if (stillOk) still.classList.add('shown');
+  if (introFailed && !stillOk) boothPh.hidden = false;
+}
+
+// --- экран 1: ввод ID ---
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const id = input.value.trim();
+  if (!ID_RE.test(id)) {
+    loginError.textContent = 'Проверьте Bigo ID';
+    form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+    return;
+  }
+  bigoId = id;
+  loginError.textContent = '';
+  input.blur();
+
+  if (introFailed) boothPh.hidden = stillOk;          // нечего проигрывать — сразу заглушка/кадр
+  const introDone = playVideo(intro, !introFailed);    // запуск в момент нажатия — так разрешён звук
+  sLogin.classList.remove('on');
+  sBooth.classList.add('on');
+
+  introDone.then(() => {
+    showBoothBase();
+    setTimeout(() => questionBox.classList.add('shown'), 450);
+  });
+});
+
+// --- экран 2: «Да» ---
+yesBtn.addEventListener('click', () => {
+  if (busy) return;
+  busy = true;
+  boothError.textContent = '';
+  questionBox.classList.remove('shown');
+
+  let animDone;
+  if (!capsuleFailed) {
+    capsule.currentTime = 0;
+    capsule.classList.add('shown');
+    animDone = playVideo(capsule, true);
+  } else {
+    whisper.classList.add('shown');
+    animDone = wait(1500);
+  }
+
+  Promise.all([animDone, getFortune(bigoId)])
+    .then(([, f]) => { whisper.classList.remove('shown'); openParchment(f); })
+    .catch(() => {
+      whisper.classList.remove('shown');
+      capsule.classList.remove('shown');
+      boothError.textContent = 'Духи молчат… Проверьте соединение и попробуйте ещё раз.';
+      questionBox.classList.add('shown');
+      busy = false;
+    });
+});
+
+async function getFortune(id) {
+  if (!SCRIPT_URL) {
+    demo.classList.add('shown');
+    return { text: DEMO_FORTUNES[Math.floor(Math.random() * DEMO_FORTUNES.length)], repeat: false };
+  }
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const r = await fetch(SCRIPT_URL + '?id=' + encodeURIComponent(id), { signal: ctrl.signal });
+    const j = await r.json();
+    if (!j.ok || !j.text) throw new Error(j.error || 'bad_response');
+    return j;
+  } finally { clearTimeout(t); }
+}
+
+// --- пергамент ---
+function parchmentSize() {
+  const a = app.getBoundingClientRect();
+  const pct = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--parchment-width')) / 100 || .8;
+  let w = Math.min(a.width * pct, 380);
+  const ratio = parchReady ? parchImg.naturalHeight / parchImg.naturalWidth : 4 / 3;
+  let h = w * ratio;
+  const maxH = a.height * .6;
+  if (h > maxH) { h = maxH; w = h / ratio; }
+  return { w: Math.round(w), h: Math.round(h) };
+}
+
+function wrapText(c, text, maxW) {
+  const words = text.split(/\s+/), lines = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (c.measureText(test).width > maxW && line) { lines.push(line); line = word; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function proceduralParchment(c, w, h) {
+  const m = w * .045, j = m * .5, N = 26, pts = [];
+  for (let i = 0; i <= N; i++) pts.push([m + (w - 2 * m) * i / N, m + rnd(-j, j)]);
+  for (let i = 1; i <= N; i++) pts.push([w - m + rnd(-j, j), m + (h - 2 * m) * i / N]);
+  for (let i = N - 1; i >= 0; i--) pts.push([m + (w - 2 * m) * i / N, h - m + rnd(-j, j)]);
+  for (let i = N - 1; i > 0; i--) pts.push([m + rnd(-j, j), m + (h - 2 * m) * i / N]);
+  c.save();
+  c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
+  pts.forEach(p => c.lineTo(p[0], p[1])); c.closePath();
+  const g = c.createRadialGradient(w / 2, h / 2, w * .1, w / 2, h / 2, w * .8);
+  g.addColorStop(0, '#f2e4bc'); g.addColorStop(1, '#c6a466');
+  c.fillStyle = g; c.fill();
+  c.clip();
+  for (let i = 0; i < 7; i++) {
+    const x = rnd(0, w), y = rnd(0, h), r = rnd(w * .05, w * .16);
+    const sg = c.createRadialGradient(x, y, 0, x, y, r);
+    sg.addColorStop(0, 'rgba(140,95,40,.18)'); sg.addColorStop(1, 'rgba(140,95,40,0)');
+    c.fillStyle = sg; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  c.strokeStyle = 'rgba(150,110,40,.55)'; c.lineWidth = 1.2;
+  c.strokeRect(w * .1, h * .08, w * .8, h * .84);
+  c.restore();
+}
+
+function drawParchment(text) {
+  const { w, h } = parchmentSize();
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  const c = cv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  if (parchReady) c.drawImage(parchImg, 0, 0, w, h); else proceduralParchment(c, w, h);
+
+  const bx = TEXT_BOX.x * w, by = TEXT_BOX.y * h, bw = TEXT_BOX.w * w, bh = TEXT_BOX.h * h;
+  let size = w * .105, lines = [text];
+  for (; size > w * .045; size -= 1) {
+    c.font = `${size}px "Marck Script", cursive`;
+    lines = wrapText(c, text, bw);
+    if (lines.length * size * 1.25 <= bh) break;
+  }
+  c.fillStyle = TEXT_COLOR; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.shadowColor = 'rgba(90,50,10,.25)'; c.shadowBlur = 1;
+  const lh = size * 1.25;
+  let y = by + bh / 2 - (lines.length * lh) / 2 + lh / 2;
+  for (const l of lines) { c.fillText(l, bx + bw / 2, y); y += lh; }
+  cv.setAttribute('aria-label', text);
+}
+
+async function openParchment(f) {
+  try { await document.fonts.load('40px "Marck Script"'); } catch (e) {}
+  drawParchment(f.text);
+  repeatNote.classList.toggle('shown', !!f.repeat);
+  parchmentBox.classList.add('open');
+  setTimeout(() => releaseBtn.classList.add('shown'), RELEASE_DELAY);
+}
+
+// --- «Отпустить предсказание»: рассыпание в пыль ---
+releaseBtn.addEventListener('click', () => {
+  if (released) return;
+  released = true;
+  releaseBtn.classList.remove('shown');
+  repeatNote.classList.remove('shown');
+  if (ASSETS.sfxDust) { try { new Audio(ASSETS.sfxDust).play().catch(() => {}); } catch (e) {} }
+  dissolve(cv).then(() => finale.classList.add('shown'));
+});
+
+function dissolve(src) {
+  return new Promise(res => {
+    const a = app.getBoundingClientRect(), r = src.getBoundingClientRect();
+    const W = Math.round(a.width), H = Math.round(a.height);
+    dust.width = W; dust.height = H;
+    dust.style.width = W + 'px'; dust.style.height = H + 'px';
+
+    const ox = r.left - a.left, oy = r.top - a.top, w = Math.round(r.width), h = Math.round(r.height);
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    const oc = off.getContext('2d');
+    oc.drawImage(src, 0, 0, w, h);
+    const d = oc.getImageData(0, 0, w, h).data;
+
+    const S = Math.max(2, Math.ceil(Math.sqrt(w * h / 24000)));   // размер частицы
+    const raw = [];
+    for (let y = 0; y < h; y += S) for (let x = 0; x < w; x += S) {
+      const i = (y * w + x) * 4, al = d[i + 3];
+      if (al < 40) continue;
+      raw.push(x, y, d[i] | (d[i + 1] << 8) | (d[i + 2] << 16), al);
+    }
+    const n = raw.length / 4;
+    const X0 = new Float32Array(n), Y0 = new Float32Array(n), COL = new Uint32Array(n), A = new Uint8Array(n);
+    const VX = new Float32Array(n), VY = new Float32Array(n), DL = new Float32Array(n), LF = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const x = raw[4 * k], y = raw[4 * k + 1];
+      X0[k] = ox + x; Y0[k] = oy + y; COL[k] = raw[4 * k + 2]; A[k] = raw[4 * k + 3];
+      DL[k] = (x / w) * 1.1 + (y / h) * .15 + Math.random() * .35;   // волна слева направо
+      VX[k] = rnd(30, 120); VY[k] = -rnd(15, 75); LF[k] = rnd(1.1, 2);
+    }
+
+    src.style.visibility = 'hidden';
+    const ctx = dust.getContext('2d');
+    const img = ctx.createImageData(W, H);
+    const buf = new Uint32Array(img.data.buffer);
+    const t0 = performance.now();
+
+    function frame(now) {
+      const t = (now - t0) / 1000;
+      buf.fill(0);
+      let alive = 0;
+      for (let k = 0; k < n; k++) {
+        let x = X0[k], y = Y0[k], al = A[k], s = S;
+        const lt = t - DL[k];
+        if (lt > 0) {
+          if (lt > LF[k]) continue;
+          const p = lt / LF[k];
+          x += VX[k] * lt + 45 * lt * lt + Math.sin((k % 17) + lt * 6) * 5 * p;
+          y += VY[k] * lt - 22 * lt * lt;
+          al = al * (1 - p);
+          s = Math.max(1, Math.round(S * (1 - p * .6)));
+        }
+        alive++;
+        const xi = x | 0, yi = y | 0;
+        if (xi < 0 || yi < 0 || xi + s >= W || yi + s >= H) continue;
+        const c = (COL[k] | ((al & 255) << 24)) >>> 0;
+        for (let dy = 0; dy < s; dy++) {
+          const o = (yi + dy) * W + xi;
+          for (let dx = 0; dx < s; dx++) buf[o + dx] = c;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      if (alive > 0) requestAnimationFrame(frame);
+      else { ctx.clearRect(0, 0, W, H); res(); }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+</script>
+</body>
+</html>
