@@ -346,6 +346,11 @@ async function getFortune(id) {
   } finally { clearTimeout(t); }
 }
 
+// --- шрифт пергамента: заранее грузим кириллицу, иначе браузер рисует запасным шрифтом ---
+const fontReady = (document.fonts && document.fonts.load)
+  ? Promise.race([document.fonts.load('40px "Marck Script"', 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя.,:—'), wait(4000)]).catch(() => {})
+  : Promise.resolve();
+
 // --- пергамент ---
 function parchmentSize() {
   const a = app.getBoundingClientRect();
@@ -407,7 +412,7 @@ function drawParchment(text) {
   const bx = TEXT_BOX.x * w, by = TEXT_BOX.y * h, bw = TEXT_BOX.w * w, bh = TEXT_BOX.h * h;
   let size = w * .105, lines = [text];
   for (; size > w * .045; size -= 1) {
-    c.font = `${size}px "Marck Script", cursive`;
+    c.font = `${size}px "Marck Script", Georgia, serif`;
     lines = wrapText(c, text, bw);
     if (lines.length * size * 1.25 <= bh) break;
   }
@@ -420,7 +425,8 @@ function drawParchment(text) {
 }
 
 async function openParchment(f) {
-  try { await document.fonts.load('40px "Marck Script"'); } catch (e) {}
+  await fontReady;
+  try { await document.fonts.load('40px "Marck Script"', f.text); } catch (e) {}
   drawParchment(f.text);
   repeatNote.classList.toggle('shown', !!f.repeat);
   parchmentBox.classList.add('open');
